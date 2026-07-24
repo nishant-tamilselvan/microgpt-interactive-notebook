@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>microGPT — Interactive Teaching Notebook</title>
+
+<!-- Teaching-notebook libraries (pinned CDN versions) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<link rel="stylesheet" id="hljs-dark" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<link rel="stylesheet" id="hljs-light" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" disabled>
+<script>
+  // Apply saved/preferred theme before paint to avoid a flash.
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('microgpt-theme'); } catch (e) {}
+    var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+    var theme = saved || (prefersLight ? 'light' : 'dark');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs';
+  window.mermaid = mermaid;
+</script>
+<style>
+  :root, :root[data-theme="dark"] {
+    --bg: #0f1117; --panel: #171a23; --panel2: #1e222d; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #9aa3b2; --accent: #6ea8fe; --accent2: #7ee787;
+    --warn: #f0883e; --bar: #2d3340;
+    --prose: #ccd2dd; --pre-bg: #0b0d13; --intro-grad: linear-gradient(160deg, #1b2233, #14161e);
+    --btn-fg: #06122b; --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f8fb; --panel: #ffffff; --panel2: #eef1f6; --border: #d8dee7;
+    --text: #1b2330; --muted: #5b6673; --accent: #2563eb; --accent2: #1a7f37;
+    --warn: #b45309; --bar: #dce2ea;
+    --prose: #2f3742; --pre-bg: #f2f4f8; --intro-grad: linear-gradient(160deg, #eaf1ff, #ffffff);
+    --btn-fg: #ffffff; --shadow: 0 1px 3px rgba(20,30,60,.08);
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark light; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    transition: background .25s ease, color .25s ease;
+  }
+  .panel, .cell, .widget, .toc a, .site-footer, header.site { transition: background .25s ease, border-color .25s ease, color .25s ease; }
+
+  /* themed scrollbars */
+  * { scrollbar-color: var(--border) transparent; scrollbar-width: thin; }
+  ::-webkit-scrollbar { width: 11px; height: 11px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; border: 2px solid var(--bg); background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+  pre { scrollbar-color: var(--border) transparent; }
+  pre::-webkit-scrollbar-thumb { border-color: var(--pre-bg); }
+  header {
+    padding: 18px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .byline { color: var(--accent2); font-size: 12px; width: 100%; margin-top: 2px; }
+  .site-footer {
+    margin-top: 40px; padding: 18px 24px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 12px; text-align: center;
+  }
+  .site-footer b { color: var(--accent2); }
+  header.site a, .site-footer a { color: var(--accent); text-decoration: none; }
+  header.site a:hover, .site-footer a:hover { text-decoration: underline; }
+  .theme-toggle {
+    position: fixed; top: 14px; right: 16px; z-index: 50;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 13px; font: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer; box-shadow: var(--shadow); line-height: 1;
+    transition: background .2s ease, border-color .2s ease, transform .1s ease;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
+  .theme-toggle:active { transform: scale(.96); }
+  .theme-toggle .ico { font-size: 14px; }
+  .theme-toggle .lbl { letter-spacing: .02em; }
+  .wrap { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px 24px; }
+  .col { display: flex; flex-direction: column; gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .panel h2 { font-size: 14px; margin: 0 0 10px; letter-spacing: .3px; }
+  .panel h2 .tag { color: var(--muted); font-weight: 400; font-size: 12px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  input[type="number"], input[type="text"], textarea, select {
+    width: 100%; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font: inherit;
+  }
+  textarea { resize: vertical; min-height: 120px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button {
+    background: var(--accent); color: var(--btn-fg); border: 0; border-radius: 6px;
+    padding: 8px 12px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.sec { background: var(--panel2); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .stat { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  .stat b { color: var(--accent2); }
+  canvas { width: 100%; background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; display: block; }
+  .samples { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; columns: 2; margin-top: 8px; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--border); font-size: 12px; }
+  .probrow { display: grid; grid-template-columns: 22px 1fr 56px; align-items: center; gap: 8px; margin: 2px 0; }
+  .probrow .ch { text-align: center; font-family: ui-monospace, monospace; }
+  .probbar { height: 14px; background: var(--bar); border-radius: 3px; overflow: hidden; }
+  .probbar > i { display: block; height: 100%; background: var(--accent); }
+  .probrow.pick .probbar > i { background: var(--accent2); }
+  .probrow .pv { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+  .heat { display: inline-grid; gap: 2px; margin: 6px 12px 6px 0; vertical-align: top; }
+  .heat .cell { width: 20px; height: 20px; border-radius: 3px; font-size: 9px; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .heat .lbl { width: 20px; height: 20px; font-size: 10px; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .gen { font-family: ui-monospace, monospace; font-size: 20px; letter-spacing: 2px; min-height: 28px; }
+  .gen .cur { color: var(--accent2); }
+  .note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .ok { color: var(--accent2); }
+  .bad { color: var(--warn); }
+  details summary { cursor: pointer; color: var(--muted); }
+  .headwrap { display: flex; flex-wrap: wrap; }
+
+  /* ---- teaching-notebook layout ---- */
+  .page { display: grid; grid-template-columns: 240px minmax(0, 880px); gap: 34px; justify-content: center; padding: 26px 24px 80px; align-items: start; }
+  .toc { position: sticky; top: 16px; align-self: start; font-size: 13px; max-height: calc(100vh - 32px); overflow: auto; }
+  .toc h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0 0 10px; }
+  .toc a { display: block; color: var(--muted); text-decoration: none; padding: 4px 10px; border-left: 2px solid transparent; line-height: 1.35; border-radius: 0 4px 4px 0; }
+  .toc a:hover { color: var(--text); background: var(--panel); }
+  .toc a.active { color: var(--accent); border-left-color: var(--accent); background: var(--panel); }
+  .notebook { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .cell { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; scroll-margin-top: 14px; }
+  .cell.intro { background: var(--intro-grad); }
+  .cell > h2 { font-size: 19px; margin: 0 0 4px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .cell > h2 .n { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .cell > h2 .tag { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .prose { color: var(--prose); }
+  .prose h3 { font-size: 15px; margin: 18px 0 6px; color: var(--text); }
+  .prose p { margin: 8px 0; }
+  .prose ul, .prose ol { margin: 8px 0; padding-left: 20px; }
+  .prose li { margin: 3px 0; }
+  .prose code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9em; color: var(--accent2); }
+  .prose a { color: var(--accent); }
+  .prose table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
+  .prose th, .prose td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+  .prose th { background: var(--panel2); }
+  .prose strong { color: var(--text); }
+  .prose blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid var(--accent); color: var(--muted); background: var(--panel2); border-radius: 0 6px 6px 0; }
+  .math { margin: 14px 0; overflow-x: auto; }
+  pre { background: var(--pre-bg) !important; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 12px 0; }
+  pre code.hljs { background: transparent; padding: 0; font-size: 12.5px; line-height: 1.55; }
+  details.jsport { margin: 8px 0 0; }
+  details.jsport > summary { font-size: 12px; color: var(--muted); }
+  details.jsport pre { margin-top: 8px; }
+  .widget { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 15px 16px; margin: 16px 0 2px; }
+  .widget > .wlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin-bottom: 10px; font-weight: 600; }
+  .mermaid { margin: 16px 0; text-align: center; }
+  .mermaid svg { max-width: 100%; height: auto; }
+  .tok-out { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .tok-chip { display: inline-flex; flex-direction: column; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; min-width: 30px; }
+  .tok-chip .c { font-family: ui-monospace, monospace; font-size: 16px; color: var(--accent2); line-height: 1.4; }
+  .tok-chip .i { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tok-chip.bos .c { color: var(--warn); }
+  .sd-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 4px; }
+  .sd-table th, .sd-table td { border: 1px solid var(--border); padding: 5px 9px; text-align: left; }
+  .sd-table th { background: var(--bg); color: var(--muted); }
+  .sd-table td.mono { font-family: ui-monospace, monospace; color: var(--accent2); }
+  .inline-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .inline-row > div { flex: 1; min-width: 90px; }
+  .abc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 320px; }
+  header.site {
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+    padding: 48px 24px 30px; border-bottom: 1px solid var(--border); text-align: center;
+    background:
+      radial-gradient(ellipse 55% 130% at 50% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 72%),
+      radial-gradient(ellipse 40% 120% at 85% 0%, color-mix(in srgb, var(--accent2) 12%, transparent), transparent 70%);
+  }
+  header.site::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: .6;
+  }
+  header.site h1 {
+    font-size: 30px; margin: 0 0 10px; letter-spacing: -.4px; font-weight: 700;
+    position: relative; z-index: 1;
+  }
+  header.site h1 .brand {
+    background: linear-gradient(100deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header.site .sub { color: var(--muted); font-size: 14px; max-width: 640px; margin: 0 auto; display: block; line-height: 1.55; position: relative; z-index: 1; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 7px; margin: 0 0 16px;
+    padding: 5px 13px; border-radius: 999px; font-size: 12px; font-weight: 600; letter-spacing: .02em;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); position: relative; z-index: 1;
+  }
+  .hero-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent2) 70%, transparent); animation: pulse 2.4s ease-out infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent2) 60%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .hero-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 16px auto 6px; max-width: 560px; position: relative; z-index: 1; }
+  .hero-tags .chip {
+    font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 7px; padding: 4px 11px; font-variant-numeric: tabular-nums;
+  }
+  .hero-tags .chip b { color: var(--accent); font-weight: 600; }
+  .hero-byline {
+    display: inline-flex; align-items: center; gap: 9px; margin-top: 18px;
+    font-size: 12.5px; color: var(--muted); position: relative; z-index: 1;
+  }
+  .hero-byline .avatar {
+    width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .3px; color: var(--btn-fg);
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+  }
+  .hero-byline b { color: var(--text); font-weight: 600; }
+  @media (max-width: 860px) {
+    .page { grid-template-columns: 1fr; }
+    .toc { position: static; max-height: none; margin-bottom: 4px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  }
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme">
+  <span class="ico" aria-hidden="true"></span><span class="lbl"></span>
+</button>
+<header class="site">
+  <span class="hero-badge"><span class="dot"></span> Pure Python · No dependencies</span>
+  <h1><span class="brand">microGPT</span> — Interactive Teaching Notebook</h1>
+  <span class="sub">A guided, cell-by-cell build of Andrej Karpathy's <a class="mono" href="https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95" target="_blank" rel="noopener">microgpt.py</a> — a complete GPT in pure, dependency-free code. Read the story, run every piece live, and watch a tiny transformer learn to dream up names.</span>
+  <div class="hero-tags">
+    <span class="chip"><b>Autograd</b> — scalar engine</span>
+    <span class="chip"><b>Transformer</b> — self-attention</span>
+    <span class="chip"><b>Training</b> — backprop + Adam</span>
+    <span class="chip"><b>Inference</b> — live sampling</span>
+  </div>
+  <span class="hero-byline"><span class="avatar">NT</span> Interactive notebook by <a href="https://github.com/nishant-tamilselvan" target="_blank" rel="noopener"><b>Nishant Tamilselvan</b></a></span>
+</header>
+
+<div class="page">
+  <aside class="toc">
+    <h3>Contents</h3>
+    <nav id="toc"></nav>
+  </aside>
+
+  <main class="notebook">
+
+    <!-- ===== Intro ===== -->
+    <section class="cell intro" id="c-intro">
+      <h2 data-toc="Introduction"><span class="n">00</span> Introduction</h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+microGPT teaches a small neural network a single skill: **predict the next character** in a name. After training on ~32,000 real names, it can *hallucinate* brand-new plausible ones, one character at a time.
+
+The whole thing is deliberately **atomic** — every piece of a real GPT is present, but written from scratch with no libraries (no NumPy, no PyTorch):
+
+- **Autograd** — a scalar automatic-differentiation engine (the `Value` class).
+- **Transformer** — token + positional embeddings, multi-head self-attention, an MLP, RMSNorm, residuals (GPT-2 style).
+- **Training** — cross-entropy loss, backprop, and the Adam optimizer with learning-rate decay.
+- **Inference** — autoregressive sampling with a temperature control.
+
+> *"This file is the complete algorithm. Everything else is just efficiency."* — the guiding idea. Real frameworks do the exact same math, just faster and on vectors/GPUs.
+
+**A preview of the payoff.** After ~1000 training steps the model *hallucinates* fresh, plausible names it has never seen — `kamon`, `karai`, `jaire`, `areli`, `kaina`, `keylen`. From a large model's point of view your entire ChatGPT conversation is just one long "document"; its reply is a statistical completion of that document, exactly like microGPT completing a name.
+
+**How to use this notebook.** Read top to bottom. Each cell pairs the real Python from `microgpt.py` with a live widget you can poke. The widgets run an identical JavaScript port of the engine — so what you see is the real computation, not a mock-up. Pre-trained weights load automatically, so generation and attention are live from the start.
+      </script></div>
+      <div class="widget">
+        <div class="wlabel">Model configuration (advanced — optional)</div>
+        <details>
+          <summary class="muted">Architecture, dataset, and Build / Reset — tweak these to experiment (idea 13: sandbox)</summary>
+          <div style="margin-top:12px">
+            <div class="inline-row">
+              <div><label>embedding dim (n_embd)</label><input id="n_embd" type="number" value="16" min="4" max="64" step="1"></div>
+              <div><label>heads (n_head)</label><input id="n_head" type="number" value="4" min="1" max="8" step="1"></div>
+              <div><label>layers (n_layer)</label><input id="n_layer" type="number" value="1" min="1" max="4" step="1"></div>
+              <div><label>context (block_size)</label><input id="block_size" type="number" value="16" min="4" max="32" step="1"></div>
+            </div>
+            <label style="margin-top:10px">dataset — one name per line</label>
+            <textarea id="dataset"></textarea>
+            <div class="btns">
+              <button id="rebuild">Build / Reset model</button>
+              <button class="sec" id="loadFile">Load .txt…</button>
+              <input id="fileInput" type="file" accept=".txt" style="display:none">
+            </div>
+            <div class="note" id="modelInfo">no model yet</div>
+            <div class="note" id="dataInfo"></div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- ===== 1. Tokenizer ===== -->
+    <section class="cell" id="c-tokenizer">
+      <h2><span class="n">01</span> Tokenizer <span class="tag">— characters ↔ integers</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+Neural networks work on numbers, not text, so every character is mapped to an integer id.
+
+- `uchars` — the sorted unique characters become ids `0..n-1`.
+- `BOS` — one extra special "Beginning/End Of Sequence" token (id `= len(uchars)`) that marks the start **and** end of a name.
+- `vocab_size` — total distinct tokens (`len(uchars) + 1`).
+
+For the names dataset the vocabulary is **27 tokens**: 26 lowercase letters `a–z` plus the single `BOS` marker. A name like `ava` becomes `[BOS, id('a'), id('v'), id('a'), BOS]`.
+
+The integer ids carry **no meaning of their own** — each token is just a distinct symbol (they might as well be emoji). Wrapping every name with `BOS` on both sides teaches the model that one `BOS` *starts* a name and the next `BOS` *ends* it.
+      <script type="text/plain" class="code-src" data-lang="python">
+uchars = sorted(set(''.join(docs)))   # unique chars become token ids 0..n-1
+BOS = len(uchars)                      # special Beginning/End Of Sequence token
+vocab_size = len(uchars) + 1           # +1 for BOS
+
+# encode a name: wrap it with BOS on both sides
+tokens = [BOS] + [uchars.index(ch) for ch in doc] + [BOS]
+      </script>
+      <div class="widget">
+        <div class="wlabel">Try the tokenizer</div>
+        <label>type a name (dataset characters only)</label>
+        <input id="tokInput" type="text" value="ava">
+        <div class="tok-out" id="tokOut"></div>
+      </div>
+    </section>
+
+    <!-- ===== 2. Value / autograd ===== -->
+    <section class="cell" id="c-value">
+      <h2><span class="n">02</span> The <span class="mono">Value</span> engine <span class="tag">— autograd</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+This is the heart of the file. Each `Value` wraps **one scalar number** and remembers how it was computed, so gradients can flow backward through it. Every node stores four things: its `data` (forward value), its `grad` (∂loss/∂node), its `_children`, and the `_local_grads` (local derivative w.r.t. each child).
+
+**Forward pass:** every operator (`+`, `*`, `**`, `log`, `exp`, `relu`) returns a new `Value` that both computes the result *and* records its children and local derivatives. For `a * b` it stores local grads `(b.data, a.data)`, because ∂(a·b)/∂a = b and ∂(a·b)/∂b = a.
+
+**Backward pass:** `backward()` does a topological sort, seeds the output with `grad = 1`, then walks the graph in reverse applying the chain rule — `child.grad += local_grad * v.grad`. That is exactly reverse-mode automatic differentiation, the same principle as PyTorch's autograd, one scalar at a time.
+
+**Think in lego blocks.** Each operation is a tiny block: it takes inputs, produces an output (forward), and knows how its output changes with each input (the local gradient). That is all autograd needs; the rest is the chain rule stringing blocks together. The intuition: *"if a car goes twice as fast as a bike, and the bike four times as fast as a walker, the car goes 2 × 4 = 8× the walker."* Backprop just multiplies these rates of change along every path.
+
+**Why `+=` and not `=`?** When a value feeds the graph in more than one place, gradients arrive from each branch and must be **summed** (the multivariable chain rule). With `c = a * b` and `L = c + a`, `a` is used twice, so `a.grad = b + 1 = 4.0` while `b.grad = a = 2.0` — the exact numbers PyTorch's `.backward()` returns.
+      </script></div>
+      <div class="math">$$ \frac{\partial L}{\partial \text{child}} \mathrel{+}= \underbrace{\frac{\partial v}{\partial \text{child}}}_{\text{local grad}} \cdot \frac{\partial L}{\partial v} \qquad\text{(chain rule)} $$</div>
+      <script type="text/plain" class="mermaid-src">
+flowchart LR
+    a["a (data, grad)"] --> mul(["*"])
+    b["b (data, grad)"] --> mul
+    mul --> z["z = a*b"]
+    z --> loss["loss"]
+    loss -. "grad=1" .-> z
+    z -. "child.grad += local_grad * z.grad" .-> a
+    z -. "child.grad += local_grad * z.grad" .-> b
+      </script>
+      <script type="text/plain" class="code-src" data-lang="python">
+class Value:
+    def __init__(self, data, children=(), local_grads=()):
+        self.data = data              # forward value
+        self.grad = 0                 # ∂loss/∂this, filled in backward
+        self._children = children     # inputs it was built from
+        self._local_grads = local_grads
+
+    def __mul__(self, other):         # a * b records local grads (b, a)
+        other = other if isinstance(other, Value) else Value(other)
+        return Value(self.data * other.data, (self, other), (other.data, self.data))
+
+    def backward(self):
+        topo, visited = [], set()
+        def build_topo(v):
+            if v not in visited:
+                visited.add(v)
+                for child in v._children: build_topo(child)
+                topo.append(v)
+        build_topo(self)
+        self.grad = 1
+        for v in reversed(topo):
+            for child, local_grad in zip(v._children, v._local_grads):
+                child.grad += local_grad * v.grad
+      </script>
+      <div class="widget">
+        <div class="wlabel">Live computation graph — L = (a·b) + c (idea 10)</div>
+        <div class="abc">
+          <div><label>a</label><input id="gA" type="number" value="2" step="1"></div>
+          <div><label>b</label><input id="gB" type="number" value="-3" step="1"></div>
+          <div><label>c</label><input id="gC" type="number" value="10" step="1"></div>
+        </div>
+        <div class="btns">
+          <button class="sec" id="gForward">Forward</button>
+          <button class="sec" id="gBackward">Backward</button>
+          <button class="sec" id="gReset">Reset</button>
+        </div>
+        <canvas id="graphCanvas" height="240"></canvas>
+        <div class="note" id="graphInfo">Edit a, b, c to see forward values update; press Backward to fill in gradients via the chain rule.</div>
+      </div>
+    </section>
+
+    <!-- ===== 3. Parameters ===== -->
+    <section class="cell" id="c-params">
+      <h2><span class="n">03</span> Parameters <span class="tag">— the model's knowledge (state_dict)</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+All learnable weights are `Value` objects, randomly initialized with `random.gauss(0, 0.08)` and grouped in a `state_dict`. They are then flattened into a single list `params` so the optimizer can iterate over every weight uniformly. For the default config that is **4192** parameters.
+      </script></div>
+      <table class="sd-table" id="sdTable"></table>
+      <div class="note" id="paramInfo" style="margin-top:10px"></div>
+      <script type="text/plain" class="code-src" data-lang="python">
+matrix = lambda nout, nin, std=0.08: [[Value(random.gauss(0, std)) for _ in range(nin)] for _ in range(nout)]
+state_dict = {'wte': matrix(vocab_size, n_embd), 'wpe': matrix(block_size, n_embd), 'lm_head': matrix(vocab_size, n_embd)}
+for i in range(n_layer):
+    state_dict[f'layer{i}.attn_wq'] = matrix(n_embd, n_embd)
+    state_dict[f'layer{i}.attn_wk'] = matrix(n_embd, n_embd)
+    state_dict[f'layer{i}.attn_wv'] = matrix(n_embd, n_embd)
+    state_dict[f'layer{i}.attn_wo'] = matrix(n_embd, n_embd)
+    state_dict[f'layer{i}.mlp_fc1'] = matrix(4 * n_embd, n_embd)
+    state_dict[f'layer{i}.mlp_fc2'] = matrix(n_embd, 4 * n_embd)
+params = [p for mat in state_dict.values() for row in mat for p in row]
+      </script>
+    </section>
+
+    <!-- ===== 4. gpt() forward ===== -->
+    <section class="cell" id="c-gpt">
+      <h2><span class="n">04</span> The <span class="mono">gpt()</span> forward pass <span class="tag">— embed → attention → MLP → logits</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+`gpt()` maps **one token + its position** to **logits** (raw scores over the next character). It follows GPT-2 with small simplifications (RMSNorm instead of LayerNorm, no biases, ReLU instead of GeLU):
+
+1. **Embed** — add the token embedding and the positional embedding.
+2. **Per layer** — an **attention block** (query/key/value, cache k,v, scaled dot-product attention over all previous positions, residual) then an **MLP block** (RMSNorm → expand → ReLU → contract → residual).
+3. **Project** — `lm_head` turns the final vector into `vocab_size` logits.
+
+Attention is where a character *looks back* at earlier characters. Each head scores every previous position and mixes their values by how much they matter.
+
+**Query, key, value — an intuition.** Each position projects to a **query** ("what am I looking for?"), a **key** ("what do I contain?"), and a **value** ("what do I offer if picked?"). Predicting the letter after the second `m` in `emma`, a head might learn the query "what vowels came before?"; the earlier `e` has a matching key, wins a high attention weight, and its value flows in. Attention is the **only** place a token looks at the past — it is a *communication* mechanism, while the MLP is *computation* done independently per position. A Transformer just interleaves the two on a residual stream.
+
+The KV cache is used here even during **training**. Usually tied to inference, it is conceptually always present — production code just hides it inside a big vectorized attention. Because microGPT runs one token at a time, the cached keys/values are live `Value` nodes we actually backpropagate through.
+      </script></div>
+      <div class="math">$$ \text{softmax}(x)_i = \frac{e^{x_i}}{\sum_j e^{x_j}} \qquad \text{attention} = \text{softmax}\!\left(\frac{q\cdot k}{\sqrt{d_{\text{head}}}}\right) \qquad \text{rmsnorm}(x) = \frac{x}{\sqrt{\overline{x^2}+\varepsilon}} $$</div>
+      <script type="text/plain" class="mermaid-src">
+flowchart TD
+    T["token id"] --> E["wte + wpe<br/>embedding"]
+    P["position id"] --> E
+    E --> N1["rmsnorm"]
+    N1 --> ATT["multi-head<br/>self-attention"]
+    ATT --> R1(["+ residual"])
+    N1 --> R1
+    R1 --> N2["rmsnorm"]
+    N2 --> MLP["MLP:<br/>fc1 → ReLU → fc2"]
+    MLP --> R2(["+ residual"])
+    R1 --> R2
+    R2 --> H["lm_head"]
+    H --> L["logits<br/>(vocab_size scores)"]
+      </script>
+      <script type="text/plain" class="code-src" data-lang="python">
+def gpt(token_id, pos_id, keys, values):
+    x = [t + p for t, p in zip(state_dict['wte'][token_id], state_dict['wpe'][pos_id])]
+    x = rmsnorm(x)
+    for li in range(n_layer):
+        # 1) Multi-head Attention
+        x_residual = x
+        x = rmsnorm(x)
+        q = linear(x, state_dict[f'layer{li}.attn_wq'])
+        k = linear(x, state_dict[f'layer{li}.attn_wk'])
+        v = linear(x, state_dict[f'layer{li}.attn_wv'])
+        keys[li].append(k); values[li].append(v)
+        x_attn = []
+        for h in range(n_head):
+            hs = h * head_dim
+            q_h = q[hs:hs+head_dim]
+            k_h = [ki[hs:hs+head_dim] for ki in keys[li]]
+            v_h = [vi[hs:hs+head_dim] for vi in values[li]]
+            attn_logits = [sum(q_h[j] * k_h[t][j] for j in range(head_dim)) / head_dim**0.5 for t in range(len(k_h))]
+            attn_weights = softmax(attn_logits)
+            x_attn.extend([sum(attn_weights[t] * v_h[t][j] for t in range(len(v_h))) for j in range(head_dim)])
+        x = linear(x_attn, state_dict[f'layer{li}.attn_wo'])
+        x = [a + b for a, b in zip(x, x_residual)]
+        # 2) MLP
+        x_residual = x
+        x = rmsnorm(x)
+        x = linear(x, state_dict[f'layer{li}.mlp_fc1'])
+        x = [xi.relu() for xi in x]
+        x = linear(x, state_dict[f'layer{li}.mlp_fc2'])
+        x = [a + b for a, b in zip(x, x_residual)]
+    return linear(x, state_dict['lm_head'])
+      </script>
+      <div class="widget">
+        <div class="wlabel">Attention heatmap (idea 9)</div>
+        <div class="inline-row">
+          <div style="flex:2"><label>input string</label><input id="attnInput" type="text" value="emma"></div>
+          <div style="flex:1;display:flex;align-items:flex-end"><button id="showAttn" style="width:100%">Show attention</button></div>
+        </div>
+        <div class="note">Rows = query position (the char doing the looking), columns = key position (the char being looked at). Brighter = more attention. Layer 0, per head.</div>
+        <div id="attn" class="headwrap" style="margin-top:10px"></div>
+      </div>
+    </section>
+
+    <!-- ===== 5. Adam ===== -->
+    <section class="cell" id="c-adam">
+      <h2><span class="n">05</span> Adam <span class="tag">— the optimizer</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+Once gradients are computed, **Adam** updates every parameter. It keeps two running buffers per parameter — `m` (first moment, the smoothed gradient) and `v` (second moment, the smoothed squared gradient) — applies bias correction, and steps each weight. The learning rate `lr_t` **decays linearly to zero** over training, so updates get gentler as the model converges.
+      </script></div>
+      <div class="math">$$ m \leftarrow \beta_1 m + (1-\beta_1)\,g,\quad v \leftarrow \beta_2 v + (1-\beta_2)\,g^2 \qquad p \mathrel{-}= \frac{\text{lr}_t\; \hat m}{\sqrt{\hat v}+\varepsilon},\quad \text{lr}_t = \text{lr}\left(1 - \tfrac{\text{step}}{\text{num\_steps}}\right) $$</div>
+      <script type="text/plain" class="code-src" data-lang="python">
+lr_t = learning_rate * (1 - step / num_steps)   # linear decay
+for i, p in enumerate(params):
+    m[i] = beta1 * m[i] + (1 - beta1) * p.grad
+    v[i] = beta2 * v[i] + (1 - beta2) * p.grad ** 2
+    m_hat = m[i] / (1 - beta1 ** (step + 1))
+    v_hat = v[i] / (1 - beta2 ** (step + 1))
+    p.data -= lr_t * m_hat / (v_hat ** 0.5 + eps_adam)
+    p.grad = 0
+      </script>
+    </section>
+
+    <!-- ===== 6. Training ===== -->
+    <section class="cell" id="c-training">
+      <h2><span class="n">06</span> Training loop <span class="tag">— one name per step</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+Training processes **one name per step**. For each position it runs `gpt()` → `softmax` → probabilities, and the loss at that position is `-log(prob of the correct next character)` (cross-entropy). The per-position losses are averaged into one final `loss` node that ties the whole graph together; `loss.backward()` fills every gradient; Adam updates every weight.
+
+Cross-entropy measures **surprise**: assign probability 1.0 to the right character and the loss is 0; assign near-0 and it shoots toward +∞. Over 1000 steps the average loss falls from ~3.3 (random guessing among 27 tokens, −log(1/27)) down to ~2.37 — the model is clearly learning the shape of names.
+
+The real model trains for 1000 steps in Python then saves `model.pkl`. In the browser the scalar autograd is slow, so **the pre-trained weights are already loaded** — press *Load pre-trained* for instant results, or press *Train* to watch a fresh model learn (use a small step count; it is deliberately slow).
+      </script></div>
+      <div class="math">$$ \text{loss} = \frac{1}{n}\sum_{t=1}^{n} -\log p_\theta\big(\text{target}_t \mid \text{context}_{<t}\big) $$</div>
+      <script type="text/plain" class="mermaid-src">
+flowchart TD
+    A["pick name: docs[step % N]"] --> B["tokenize: BOS + chars + BOS"]
+    B --> C{"for each position"}
+    C --> D["gpt(token, pos) → logits"]
+    D --> E["softmax → probs"]
+    E --> F["loss_t = -log(prob of target)"]
+    F --> C
+    C -->|done| G["loss = average(loss_t)"]
+    G --> H["loss.backward() → grads"]
+    H --> I["Adam updates all params"]
+    I --> J["zero grads"]
+    J --> K{"more steps?"}
+    K -->|yes| A
+    K -->|no| S["save model.pkl"]
+      </script>
+      <div class="widget">
+        <div class="wlabel">Train / watch it learn (idea 11)</div>
+        <div class="inline-row">
+          <div><label>learning rate</label><input id="lr" type="number" value="0.01" min="0.0001" max="0.5" step="0.001"></div>
+          <div><label>train steps</label><input id="num_steps" type="number" value="300" min="50" max="5000" step="50"></div>
+        </div>
+        <div class="btns">
+          <button id="train">▶ Train</button>
+          <button class="sec" id="pause" disabled>Pause</button>
+          <button class="sec" id="loadPre">Load pre-trained (instant)</button>
+        </div>
+        <div style="margin-top:10px"><canvas id="lossCanvas" height="160"></canvas></div>
+        <div style="margin-top:10px">
+          <div class="stat"><span class="muted">step</span> <b id="stStep">0</b></div>
+          <div class="stat"><span class="muted">loss</span> <b id="stLoss">–</b></div>
+        </div>
+        <div class="muted" style="margin-top:8px">live samples</div>
+        <div class="samples" id="samples"></div>
+      </div>
+    </section>
+
+    <!-- ===== 7. Inference ===== -->
+    <section class="cell" id="c-inference">
+      <h2><span class="n">07</span> Inference <span class="tag">— hallucinating new names</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+To generate, start from `BOS` and produce characters autoregressively until the model emits `BOS` again (end of name) or hits `block_size`. Each step: run `gpt()` → apply **temperature** (`logits / temperature`) → `softmax` → **sample** the next token weighted by those probabilities → feed it back in. That feedback loop is what "autoregressive" means. Lower temperature = safer, more repetitive; higher = more creative, more chaotic. Temperature → 0 becomes **greedy decoding** (always the single most likely token); temperature = 1 samples straight from the learned distribution.
+      </script></div>
+      <script type="text/plain" class="mermaid-src">
+flowchart TD
+    A["token = BOS"] --> B["gpt(token, pos) → logits"]
+    B --> C["apply temperature<br/>softmax → probs"]
+    C --> D["sample next token"]
+    D --> E{"token == BOS?"}
+    E -->|yes| F["name finished → print"]
+    E -->|no| G["append char, feed token back"]
+    G --> B
+      </script>
+      <script type="text/plain" class="code-src" data-lang="python">
+temperature = 0.5
+token_id = BOS
+for pos_id in range(block_size):
+    logits = gpt(token_id, pos_id, keys, values)
+    probs = softmax([l / temperature for l in logits])
+    token_id = random.choices(range(vocab_size), weights=[p.data for p in probs])[0]
+    if token_id == BOS:
+        break
+    sample.append(uchars[token_id])
+      </script>
+      <div class="widget">
+        <div class="wlabel">Generate & step through (idea 12: probability bars)</div>
+        <div class="inline-row">
+          <div style="flex:2"><label>prefix (optional)</label><input id="prefix" type="text" placeholder="e.g. ma"></div>
+          <div style="flex:1"><label>temperature</label><input id="temp" type="number" value="0.5" min="0.1" max="2" step="0.1"></div>
+        </div>
+        <div class="btns">
+          <button id="gen">Generate name</button>
+          <button class="sec" id="step">Step one token</button>
+        </div>
+        <div class="gen" id="genOut" style="margin-top:10px"></div>
+        <div class="muted" style="margin-top:8px">next-token distribution</div>
+        <div id="probs"></div>
+      </div>
+    </section>
+
+    <!-- ===== 8. Full flow + parity ===== -->
+    <section class="cell" id="c-fullflow">
+      <h2><span class="n">08</span> The whole program <span class="tag">— setup → train/load → inference</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+End to end, the script runs three phases: **setup** (load data, build tokenizer, init params + Adam buffers), **train or load** (train and save `model.pkl`, or load it and skip training), and **inference** (sample 20 new names).
+      </script></div>
+      <script type="text/plain" class="mermaid-src">
+flowchart TD
+    START(["run microgpt.py"]) --> LOAD["load & shuffle docs"]
+    LOAD --> TOK["build tokenizer<br/>(uchars, BOS, vocab_size)"]
+    TOK --> INIT["init params (state_dict)<br/>+ Adam buffers m, v"]
+    INIT --> GUARD{"model.pkl exists?"}
+    GUARD -->|yes| LOADW["load weights<br/>(skip training)"]
+    GUARD -->|no| TRAIN["train loop: num_steps"]
+    TRAIN --> SAVE["save model.pkl"]
+    LOADW --> INFER["inference: 20 samples"]
+    SAVE --> INFER
+    INFER --> END(["done"])
+      </script>
+      <div class="prose"><script type="text/plain" class="prose-src">
+### Is the browser math *really* the same as Python?
+
+Yes — and you can prove it. The parity self-test runs the JS `gpt()` on `(BOS, position 0)` with the pre-trained weights and compares the 27 logits against a reference vector captured from the Python `parity_test.py`. If the maximum absolute error is below `1e-4`, the ports are numerically identical.
+      </script></div>
+      <div class="widget">
+        <div class="wlabel">Proof: JavaScript == Python</div>
+        <div class="btns">
+          <button id="parity">Run parity self-test</button>
+          <button class="sec" id="saveW">Save weights</button>
+          <button class="sec" id="loadW">Load weights…</button>
+          <input id="wInput" type="file" accept=".json" style="display:none">
+        </div>
+        <div class="note" id="ioInfo"></div>
+      </div>
+    </section>
+
+    <!-- ===== 9. From microGPT to ChatGPT ===== -->
+    <section class="cell" id="c-realstuff">
+      <h2 data-toc="From microGPT to ChatGPT"><span class="n">09</span> From microGPT to ChatGPT <span class="tag">— what changes at scale</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+microGPT contains the complete algorithmic essence of a GPT. Everything between it and a production model like ChatGPT is **efficiency and scale** — none of it changes the core algorithm. Walking the same sections in order:
+
+- **Data** — trillions of tokens of filtered, deduplicated internet text instead of 32K names.
+- **Tokenizer** — subword BPE (~100K tokens) instead of single characters, so each position carries more meaning.
+- **Autograd** — tensors on GPUs/TPUs instead of scalar `Value`s; identical math, massively parallel (PyTorch plus fused kernels like FlashAttention).
+- **Architecture** — hundreds of billions of parameters, far wider and deeper, with newer blocks (RoPE, GQA, gated activations, Mixture-of-Experts) — but still Attention (communication) + MLP (computation) on a residual stream.
+- **Training** — huge batches, gradient accumulation, mixed precision, thousands of GPUs running for months.
+- **Optimization** — carefully tuned schedules and scaling laws (Chinchilla) to spend a fixed compute budget well.
+- **Post-training** — SFT on curated conversations, then RL from feedback, turning a document-completer into a chatbot. Algorithmically, still training on documents.
+- **Inference** — request batching, KV-cache paging (vLLM), speculative decoding, quantization (int8/int4), multi-GPU serving.
+
+> Understand microGPT and you understand the algorithmic essence — the rest is engineering that makes it fast and large.
+      </script></div>
+    </section>
+
+    <!-- ===== 10. FAQ ===== -->
+    <section class="cell" id="c-faq">
+      <h2 data-toc="FAQ"><span class="n">10</span> FAQ <span class="tag">— common questions</span></h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+**Does the model "understand" anything?** Mechanically, no magic happens: it is a big math function mapping input tokens to a probability distribution over the next token. Training nudges the parameters to make the correct token more probable. Whether that counts as "understanding" is up to you — the mechanism is fully contained in the cells above.
+
+**Why does it work?** Thousands of adjustable parameters, nudged a little each step to lower the loss, settle into values that capture statistical regularities of the data — names start with consonants, `qu` sticks together, three consonants rarely stack. It doesn't learn explicit rules, just a distribution that reflects them.
+
+**How is this related to ChatGPT?** The same core loop — predict next token, sample, repeat — scaled up enormously and post-trained to be conversational. Your prompt and its reply are all just tokens in one sequence being completed.
+
+**What are "hallucinations"?** Sampling from a probability distribution that has no concept of truth. microGPT inventing `karia` is the same phenomenon as ChatGPT confidently stating a false fact: a plausible-sounding completion that happens not to be real.
+
+**Can I make it better?** Train longer (`num_steps`), grow the model (`n_embd`, `n_layer`, `n_head`), or use a bigger dataset — the same knobs that matter at scale. Swap the dataset (cities, Pokémon, English words) and it learns those patterns instead; the rest of the code is unchanged.
+      </script></div>
+    </section>
+
+    <!-- ===== Outro ===== -->
+    <section class="cell" id="c-outro">
+      <h2 data-toc="Takeaways"><span class="n">11</span> Takeaways</h2>
+      <div class="prose"><script type="text/plain" class="prose-src">
+In one sentence: microGPT forwards names through a scalar-autograd GPT to compute a next-character prediction loss, back-propagates to get gradients, updates the weights with Adam, and samples brand-new names one character at a time.
+
+Every number here is inspectable — that is microGPT's superpower. The same math, vectorized on a GPU, *is* a frontier language model. **Everything else is just efficiency.**
+
+**Explore the source:** [`microgpt.py`](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95) (Karpathy's original gist) · `EXPLANATION.md` (this narrative in full) · `IDEAS.md` (30+ ways to build on it) · `parity_test.py` (the numerical proof).
+      </script></div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+"use strict";
+// ============================================================================
+//  microGPT core — a faithful JS port of Karpathy's microgpt.py
+//  (scalar autograd + GPT-2-style transformer + Adam), zero dependencies.
+// ============================================================================
+
+// --- seedable RNG (so "Build / Reset" is reproducible) ---
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rand = mulberry32(42);
+function gauss(mean, std) { // Box–Muller
+  let u = 0, v = 0;
+  while (u === 0) u = rand();
+  while (v === 0) v = rand();
+  return mean + std * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// --- autograd engine: each Value is one scalar node in the graph ---
+class Value {
+  constructor(data, children = [], localGrads = []) {
+    this.data = data; this.grad = 0;
+    this._children = children; this._localGrads = localGrads;
+  }
+  add(o) { o = o instanceof Value ? o : new Value(o); return new Value(this.data + o.data, [this, o], [1, 1]); }
+  mul(o) { o = o instanceof Value ? o : new Value(o); return new Value(this.data * o.data, [this, o], [o.data, this.data]); }
+  pow(k) { return new Value(this.data ** k, [this], [k * this.data ** (k - 1)]); }
+  log() { return new Value(Math.log(this.data), [this], [1 / this.data]); }
+  exp() { const e = Math.exp(this.data); return new Value(e, [this], [e]); }
+  relu() { return new Value(Math.max(0, this.data), [this], [this.data > 0 ? 1 : 0]); }
+  neg() { return this.mul(-1); }
+  sub(o) { o = o instanceof Value ? o : new Value(o); return this.add(o.neg()); }
+  div(o) { o = o instanceof Value ? o : new Value(o); return this.mul(o.pow(-1)); }
+  backward() {
+    const topo = [], visited = new Set();
+    const build = (v) => { if (!visited.has(v)) { visited.add(v); for (const c of v._children) build(c); topo.push(v); } };
+    build(this);
+    this.grad = 1;
+    for (let i = topo.length - 1; i >= 0; i--) {
+      const v = topo[i];
+      for (let j = 0; j < v._children.length; j++) v._children[j].grad += v._localGrads[j] * v.grad;
+    }
+  }
+}
+
+// --- model helpers (mirror microgpt.py exactly) ---
+function matrix(nout, nin, std = 0.08) {
+  const m = [];
+  for (let o = 0; o < nout; o++) { const row = []; for (let i = 0; i < nin; i++) row.push(new Value(gauss(0, std))); m.push(row); }
+  return m;
+}
+function linear(x, w) {
+  return w.map(wo => { let s = new Value(0); for (let i = 0; i < wo.length; i++) s = s.add(wo[i].mul(x[i])); return s; });
+}
+function softmax(logits) {
+  let maxVal = -Infinity; for (const v of logits) if (v.data > maxVal) maxVal = v.data;
+  const exps = logits.map(v => v.sub(maxVal).exp());
+  let total = new Value(0); for (const e of exps) total = total.add(e);
+  return exps.map(e => e.div(total));
+}
+function rmsnorm(x) {
+  let ms = new Value(0); for (const xi of x) ms = ms.add(xi.mul(xi));
+  ms = ms.div(x.length);
+  const scale = ms.add(1e-5).pow(-0.5);
+  return x.map(xi => xi.mul(scale));
+}
+
+// --- the model container ---
+let CFG = null;      // { n_layer, n_embd, block_size, n_head, vocab_size }
+let SD = null;       // state_dict: { key -> matrix }
+let PARAMS = null;   // flat list of Value (same order as microgpt.py)
+let OPT = null;      // adam buffers
+let uchars = [], charToId = {}, BOS = 0;
+let lastAttn = [];   // per-head attention weights captured on last gpt() call
+
+function buildStateDict(cfg) {
+  const { vocab_size, n_embd, block_size, n_layer } = cfg;
+  const sd = {};
+  sd['wte'] = matrix(vocab_size, n_embd);
+  sd['wpe'] = matrix(block_size, n_embd);
+  sd['lm_head'] = matrix(vocab_size, n_embd);
+  for (let i = 0; i < n_layer; i++) {
+    sd[`layer${i}.attn_wq`] = matrix(n_embd, n_embd);
+    sd[`layer${i}.attn_wk`] = matrix(n_embd, n_embd);
+    sd[`layer${i}.attn_wv`] = matrix(n_embd, n_embd);
+    sd[`layer${i}.attn_wo`] = matrix(n_embd, n_embd);
+    sd[`layer${i}.mlp_fc1`] = matrix(4 * n_embd, n_embd);
+    sd[`layer${i}.mlp_fc2`] = matrix(n_embd, 4 * n_embd);
+  }
+  return sd;
+}
+function flattenParams(sd) {
+  const p = [];
+  for (const key of Object.keys(sd)) for (const row of sd[key]) for (const val of row) p.push(val);
+  return p;
+}
+
+// forward: one token + position -> logits. captureAttn fills lastAttn.
+function gpt(tokenId, posId, keys, values, captureAttn = false) {
+  const { n_layer, n_head, n_embd } = CFG;
+  const head_dim = n_embd / n_head;
+  const tok = SD['wte'][tokenId], pos = SD['wpe'][posId];
+  let x = tok.map((t, i) => t.add(pos[i]));
+  x = rmsnorm(x);
+  if (captureAttn) lastAttn = [];
+  for (let li = 0; li < n_layer; li++) {
+    let xres = x;
+    x = rmsnorm(x);
+    const q = linear(x, SD[`layer${li}.attn_wq`]);
+    const k = linear(x, SD[`layer${li}.attn_wk`]);
+    const v = linear(x, SD[`layer${li}.attn_wv`]);
+    keys[li].push(k); values[li].push(v);
+    const xattn = [];
+    const perHead = [];
+    for (let h = 0; h < n_head; h++) {
+      const hs = h * head_dim;
+      const qh = q.slice(hs, hs + head_dim);
+      const kh = keys[li].map(ki => ki.slice(hs, hs + head_dim));
+      const vh = values[li].map(vi => vi.slice(hs, hs + head_dim));
+      const attnLogits = [];
+      for (let t = 0; t < kh.length; t++) {
+        let s = new Value(0);
+        for (let j = 0; j < head_dim; j++) s = s.add(qh[j].mul(kh[t][j]));
+        attnLogits.push(s.div(Math.sqrt(head_dim)));
+      }
+      const attnWeights = softmax(attnLogits);
+      if (captureAttn && li === 0) perHead.push(attnWeights.map(w => w.data));
+      for (let j = 0; j < head_dim; j++) {
+        let s = new Value(0);
+        for (let t = 0; t < vh.length; t++) s = s.add(attnWeights[t].mul(vh[t][j]));
+        xattn.push(s);
+      }
+    }
+    if (captureAttn && li === 0) lastAttn = perHead;
+    x = linear(xattn, SD[`layer${li}.attn_wo`]);
+    x = x.map((a, i) => a.add(xres[i]));
+    xres = x;
+    x = rmsnorm(x);
+    x = linear(x, SD[`layer${li}.mlp_fc1`]);
+    x = x.map(xi => xi.relu());
+    x = linear(x, SD[`layer${li}.mlp_fc2`]);
+    x = x.map((a, i) => a.add(xres[i]));
+  }
+  return linear(x, SD['lm_head']);
+}
+
+// --- tokenizer ---
+function buildVocab(docs) {
+  const set = new Set();
+  for (const d of docs) for (const ch of d) set.add(ch);
+  uchars = [...set].sort();
+  charToId = {}; uchars.forEach((c, i) => (charToId[c] = i));
+  BOS = uchars.length;
+  return uchars.length + 1;
+}
+function encode(doc) { return [BOS, ...[...doc].map(c => charToId[c]), BOS]; }
+
+// --- optimizer state ---
+function freshOpt() {
+  return { lr: 0.01, b1: 0.85, b2: 0.99, eps: 1e-8, m: new Array(PARAMS.length).fill(0), v: new Array(PARAMS.length).fill(0) };
+}
+
+// one training step over a single document -> returns loss value
+function trainStep(tokens, step, numSteps) {
+  const { n_layer, block_size } = CFG;
+  const n = Math.min(block_size, tokens.length - 1);
+  const keys = Array.from({ length: n_layer }, () => []);
+  const values = Array.from({ length: n_layer }, () => []);
+  const losses = [];
+  for (let pos = 0; pos < n; pos++) {
+    const logits = gpt(tokens[pos], pos, keys, values);
+    const probs = softmax(logits);
+    losses.push(probs[tokens[pos + 1]].log().neg());
+  }
+  let loss = new Value(0); for (const l of losses) loss = loss.add(l); loss = loss.mul(1 / n);
+  loss.backward();
+  const { lr, b1, b2, eps } = OPT;
+  const lrT = lr * (1 - step / numSteps);
+  for (let i = 0; i < PARAMS.length; i++) {
+    const p = PARAMS[i], g = p.grad;
+    OPT.m[i] = b1 * OPT.m[i] + (1 - b1) * g;
+    OPT.v[i] = b2 * OPT.v[i] + (1 - b2) * g * g;
+    const mhat = OPT.m[i] / (1 - b1 ** (step + 1));
+    const vhat = OPT.v[i] / (1 - b2 ** (step + 1));
+    p.data -= (lrT * mhat) / (Math.sqrt(vhat) + eps);
+    p.grad = 0;
+  }
+  return loss.data;
+}
+
+// ============================================================================
+//  UI wiring
+// ============================================================================
+const $ = (id) => document.getElementById(id);
+let docs = [];
+let step = 0, numSteps = 500, lossHistory = [], training = false;
+
+const DEFAULT_NAMES = `emma olivia ava isabella sophia mia charlotte amelia harper evelyn abigail
+emily elizabeth mila ella avery sofia camila aria scarlett victoria madison luna grace chloe
+penelope layla riley zoey nora lily eleanor hannah lillian addison aubrey ellie stella natalie
+zoe leah hazel violet aurora savannah audrey brooklyn bella claire skylar lucy paisley everly
+anna caroline nova genesis emilia kennedy samantha maya willow kinsley naomi aaliyah elena
+sarah ariana allison gabriella alice madelyn cora ruby eva serenity autumn adeline hailey
+gianna valentina isla eliana quinn nevaeh ivy sadie piper lydia alexa josephine emery julia
+delilah arianna vivian kaylee sophie brielle madeline peyton rylee clara hadley melanie mackenzie
+liam noah oliver william james benjamin lucas henry alexander mason michael ethan daniel jacob
+logan jackson levi sebastian mateo jack owen theodore aiden samuel joseph john david wyatt matthew
+luke asher carter julian grayson leo jayden gabriel isaac lincoln anthony hudson dylan ezra thomas
+charles christopher jaxon maverick josiah isaiah andrew elias joshua nathan caleb ryan adrian miles`
+  .split(/\s+/).filter(Boolean).join('\n');
+
+// --- build / reset the model from current config + dataset ---
+function readCfgInputs() {
+  return {
+    n_embd: parseInt($('n_embd').value),
+    n_head: parseInt($('n_head').value),
+    n_layer: parseInt($('n_layer').value),
+    block_size: parseInt($('block_size').value),
+  };
+}
+function rebuild() {
+  training = false; $('pause').disabled = true; $('train').disabled = false;
+  rand = mulberry32(42);
+  docs = $('dataset').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (docs.length === 0) { $('modelInfo').innerHTML = '<span class="bad">dataset is empty</span>'; return; }
+  const ui = readCfgInputs();
+  if (ui.n_embd % ui.n_head !== 0) { $('modelInfo').innerHTML = '<span class="bad">n_embd must be divisible by n_head</span>'; return; }
+  const vocab_size = buildVocab(docs);
+  CFG = { ...ui, vocab_size };
+  SD = buildStateDict(CFG);
+  PARAMS = flattenParams(SD);
+  OPT = freshOpt(); OPT.lr = parseFloat($('lr').value);
+  step = 0; lossHistory = [];
+  $('stStep').textContent = '0'; $('stLoss').textContent = '–'; $('samples').innerHTML = '';
+  drawLoss();
+  $('dataInfo').textContent = `${docs.length} docs · vocab ${vocab_size} (${uchars.length} chars + BOS)`;
+  $('modelInfo').innerHTML = `params: <b class="ok">${PARAMS.length}</b> · ctx ${CFG.block_size} · ${CFG.n_layer}L/${CFG.n_head}H/${CFG.n_embd}d`;
+}
+
+// --- training loop (async, yields to keep UI responsive) ---
+async function trainLoop() {
+  if (!CFG) rebuild();
+  training = true; $('train').disabled = true; $('pause').disabled = false;
+  numSteps = parseInt($('num_steps').value);
+  OPT.lr = parseFloat($('lr').value);
+  while (step < numSteps && training) {
+    const doc = docs[step % docs.length];
+    const loss = trainStep(encode(doc), step, numSteps);
+    lossHistory.push(loss);
+    step++;
+    if (step % 3 === 0) {
+      $('stStep').textContent = `${step} / ${numSteps}`;
+      $('stLoss').textContent = loss.toFixed(4);
+      drawLoss();
+      await new Promise(r => setTimeout(r));
+    }
+    if (step % 50 === 0) showSamples();
+  }
+  training = false; $('train').disabled = false; $('pause').disabled = true;
+  $('stStep').textContent = `${step} / ${numSteps}`;
+  showSamples();
+}
+
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function drawLoss() {
+  const c = $('lossCanvas'); const w = c.width = c.clientWidth; const h = c.height;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  if (lossHistory.length < 2) return;
+  const mn = Math.min(...lossHistory), mx = Math.max(...lossHistory);
+  const pad = 6, span = (mx - mn) || 1;
+  ctx.strokeStyle = cssVar('--accent'); ctx.lineWidth = 2; ctx.beginPath();
+  lossHistory.forEach((v, i) => {
+    const x = pad + (i / (lossHistory.length - 1)) * (w - 2 * pad);
+    const y = pad + (1 - (v - mn) / span) * (h - 2 * pad);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.stroke();
+  ctx.fillStyle = cssVar('--muted'); ctx.font = '11px system-ui';
+  ctx.fillText('loss ' + mx.toFixed(2), 8, 14);
+  ctx.fillText(mn.toFixed(2), 8, h - 6);
+}
+
+function showSamples() {
+  const temp = 0.5, out = [];
+  for (let i = 0; i < 8; i++) out.push(generate(temp, '').name || '·');
+  $('samples').innerHTML = out.map(s => `<div>${s}</div>`).join('');
+}
+
+// --- generation (autoregressive), optionally conditioned on a prefix ---
+function generate(temperature, prefix) {
+  const { n_layer, block_size } = CFG;
+  const keys = Array.from({ length: n_layer }, () => []);
+  const values = Array.from({ length: n_layer }, () => []);
+  let tokenId = BOS; const chars = []; let lastProbs = null;
+  const pre = [...prefix].filter(c => c in charToId);
+  for (let pos = 0; pos < block_size; pos++) {
+    const logits = gpt(tokenId, pos, keys, values);
+    const scaled = logits.map(l => l.div(temperature));
+    const probs = softmax(scaled).map(p => p.data);
+    lastProbs = probs;
+    let nextId;
+    if (pos < pre.length) nextId = charToId[pre[pos]];
+    else nextId = sampleIdx(probs);
+    if (nextId === BOS) break;
+    chars.push(uchars[nextId]);
+    tokenId = nextId;
+  }
+  return { name: chars.join(''), probs: lastProbs };
+}
+function sampleIdx(probs) {
+  let r = rand(), acc = 0;
+  for (let i = 0; i < probs.length; i++) { acc += probs[i]; if (r <= acc) return i; }
+  return probs.length - 1;
+}
+
+// --- inference playground: step one token at a time, show distribution ---
+let infState = null;
+function resetInfer() {
+  const { n_layer } = CFG;
+  infState = {
+    keys: Array.from({ length: n_layer }, () => []),
+    values: Array.from({ length: n_layer }, () => []),
+    tokenId: BOS, pos: 0, chars: [],
+    pre: [...$('prefix').value].filter(c => c in charToId),
+  };
+}
+function inferStep() {
+  if (!CFG) return;
+  if (!infState || infState.pos === 0 && infState.chars.length === 0 && $('prefix').dataset.dirty) resetInfer();
+  if (!infState) resetInfer();
+  const temp = parseFloat($('temp').value);
+  const s = infState;
+  if (s.pos >= CFG.block_size) return;
+  const logits = gpt(s.tokenId, s.pos, s.keys, s.values);
+  const probs = softmax(logits.map(l => l.div(temp))).map(p => p.data);
+  let nextId = s.pos < s.pre.length ? charToId[s.pre[s.pos]] : sampleIdx(probs);
+  renderProbs(probs, nextId);
+  if (nextId === BOS) { renderGen(s.chars, '⏹'); infState = null; return; }
+  s.chars.push(uchars[nextId]); s.tokenId = nextId; s.pos++;
+  renderGen(s.chars, uchars[nextId]);
+}
+function renderGen(chars, cur) {
+  $('genOut').innerHTML = chars.slice(0, -1).join('') + `<span class="cur">${chars[chars.length - 1] || ''}</span>`;
+}
+function renderProbs(probs, pick) {
+  const idx = probs.map((p, i) => [p, i]).sort((a, b) => b[0] - a[0]).slice(0, 12);
+  const mx = idx[0][0] || 1;
+  $('probs').innerHTML = idx.map(([p, i]) => {
+    const label = i === BOS ? '⏹' : uchars[i];
+    const pct = ((p / mx) * 100).toFixed(1);
+    return `<div class="probrow ${i === pick ? 'pick' : ''}">
+      <span class="ch">${label}</span>
+      <span class="probbar"><i style="width:${pct}%"></i></span>
+      <span class="pv">${(p * 100).toFixed(1)}%</span></div>`;
+  }).join('');
+}
+
+// --- attention heatmap ---
+function showAttention() {
+  if (!CFG) { $('attn').innerHTML = '<span class="bad">build a model first</span>'; return; }
+  const s = [...$('attnInput').value].filter(c => c in charToId);
+  if (s.length === 0) { $('attn').innerHTML = '<span class="bad">use characters from the dataset</span>'; return; }
+  const { n_layer, n_head } = CFG;
+  const keys = Array.from({ length: n_layer }, () => []);
+  const values = Array.from({ length: n_layer }, () => []);
+  const tokens = [BOS, ...s.map(c => charToId[c])];
+  const rows = [];   // rows[pos] = perHead[[weights...]]
+  for (let pos = 0; pos < tokens.length; pos++) {
+    gpt(tokens[pos], pos, keys, values, true);
+    rows.push(lastAttn.map(h => h.slice()));
+  }
+  const labels = ['∅', ...s]; // position 0 input is BOS
+  let html = '';
+  for (let h = 0; h < n_head; h++) {
+    html += `<div><div class="muted" style="margin:0 0 4px">head ${h}</div><div class="heat" style="grid-template-columns: 20px repeat(${tokens.length}, 20px)">`;
+    // header row
+    html += `<div class="lbl"></div>`;
+    for (let t = 0; t < tokens.length; t++) html += `<div class="lbl">${labels[t]}</div>`;
+    for (let q = 0; q < tokens.length; q++) {
+      html += `<div class="lbl">${labels[q]}</div>`;
+      for (let t = 0; t < tokens.length; t++) {
+        if (t <= q) {
+          const wv = rows[q][h][t];
+          const col = heatColor(wv);
+          html += `<div class="cell" style="background:${col}" title="q=${labels[q]} k=${labels[t]}: ${wv.toFixed(3)}">${wv >= 0.5 ? Math.round(wv * 10) : ''}</div>`;
+        } else {
+          html += `<div class="cell" style="background:var(--bar)"></div>`;
+        }
+      }
+    }
+    html += `</div></div>`;
+  }
+  $('attn').innerHTML = html;
+}
+function heatColor(w) {
+  // 0 -> subtle background, 1 -> bright accent (adapts to theme)
+  const t = Math.max(0, Math.min(1, w));
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if (isLight) {
+    const r = Math.round(234 + t * (37 - 234));
+    const g = Math.round(241 + t * (99 - 241));
+    const b = Math.round(255 + t * (235 - 255));
+    return `rgb(${r},${g},${b})`;
+  }
+  const r = Math.round(20 + t * (110 - 20));
+  const g = Math.round(30 + t * (168 - 30));
+  const b = Math.round(45 + t * (254 - 45));
+  return `rgb(${r},${g},${b})`;
+}
+
+// --- computation-graph visualizer (toy: L = a*b + c) ---
+let G = null;
+function buildGraph() {
+  const gv = (id, d) => { const el = document.getElementById(id); const n = el ? parseFloat(el.value) : NaN; return new Value(Number.isFinite(n) ? n : d); };
+  const a = gv('gA', 2), b = gv('gB', -3), c = gv('gC', 10);
+  const e = a.mul(b);   // a*b
+  const L = e.add(c);   // + c
+  G = { a, b, c, e, L, phase: 'built' };
+}
+const GRAPH_NODES = () => ([
+  { key: 'a', label: 'a', x: 60, y: 60 },
+  { key: 'b', label: 'b', x: 60, y: 180 },
+  { key: 'e', label: 'a·b', x: 230, y: 120 },
+  { key: 'c', label: 'c', x: 230, y: 200 },
+  { key: 'L', label: 'L', x: 400, y: 160 },
+]);
+const GRAPH_EDGES = [['a', 'e'], ['b', 'e'], ['e', 'L'], ['c', 'L']];
+function drawGraph() {
+  const c = $('graphCanvas'); const w = c.width = c.clientWidth; const h = c.height;
+  const ctx = c.getContext('2d'); ctx.clearRect(0, 0, w, h);
+  const nodes = GRAPH_NODES(); const pos = {}; nodes.forEach(n => pos[n.key] = n);
+  const accent = cssVar('--accent'), accent2 = cssVar('--accent2');
+  ctx.strokeStyle = cssVar('--muted'); ctx.lineWidth = 1.5;
+  for (const [f, t] of GRAPH_EDGES) { ctx.beginPath(); ctx.moveTo(pos[f].x + 26, pos[f].y); ctx.lineTo(pos[t].x - 26, pos[t].y); ctx.stroke(); }
+  for (const n of nodes) {
+    const val = G ? G[n.key] : null;
+    const showGrad = G && (G.phase === 'backward');
+    ctx.fillStyle = cssVar('--panel2'); ctx.strokeStyle = showGrad ? accent2 : accent; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(n.x - 26, n.y - 24, 52, 48, 8); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = cssVar('--text'); ctx.font = '13px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(n.label, n.x, n.y - 8);
+    if (val) { ctx.fillStyle = cssVar('--muted'); ctx.font = '11px ui-monospace'; ctx.fillText('d=' + val.data.toFixed(1), n.x, n.y + 6); }
+    if (showGrad && val) { ctx.fillStyle = accent2; ctx.fillText('g=' + val.grad.toFixed(1), n.x, n.y + 19); }
+  }
+  ctx.textAlign = 'left';
+}
+
+// ============================================================================
+//  parity self-test: logits for (BOS, pos 0) must match parity_test.py
+// ============================================================================
+const PARITY_REF = [1.024958, -0.518177, -0.034957, 0.022251, 0.00825, -1.503495, -1.421325, -0.843278, -0.685894, 0.46114, 0.558768, 0.009492, 0.438745, -0.346302, -0.883473, -1.394557, -4.642841, -0.27683, 0.322629, -0.34457, -2.205305, -1.177379, -1.963701, -2.716639, -1.107462, -0.297012, -2.501625];
+async function loadPretrained() {
+  try {
+    const res = await fetch('weights.json');
+    const j = await res.json();
+    applyWeightsBundle(j);
+    $('ioInfo').innerHTML = `<span class="ok">loaded weights.json</span> · ${j.weights.length} params`;
+    showSamples();
+  } catch (e) {
+    $('ioInfo').innerHTML = `<span class="bad">could not fetch weights.json — open via a local server, or use “Load weights…”.</span>`;
+  }
+}
+function applyWeightsBundle(j) {
+  // Rebuild vocab + model from the bundle, then load the flat weights.
+  uchars = j.uchars.slice(); charToId = {}; uchars.forEach((c, i) => charToId[c] = i); BOS = uchars.length;
+  CFG = { ...j.config };
+  // reflect into the config inputs
+  $('n_embd').value = CFG.n_embd; $('n_head').value = CFG.n_head; $('n_layer').value = CFG.n_layer; $('block_size').value = CFG.block_size;
+  SD = buildStateDict(CFG); PARAMS = flattenParams(SD); OPT = freshOpt();
+  if (j.weights.length !== PARAMS.length) throw new Error('param count mismatch');
+  for (let i = 0; i < PARAMS.length; i++) PARAMS[i].data = j.weights[i];
+  $('modelInfo').innerHTML = `params: <b class="ok">${PARAMS.length}</b> (pre-trained)`;
+  step = 0; lossHistory = []; drawLoss();
+}
+async function runParity() {
+  try {
+    const res = await fetch('weights.json');
+    const j = await res.json();
+    applyWeightsBundle(j);
+    const keys = Array.from({ length: CFG.n_layer }, () => []);
+    const values = Array.from({ length: CFG.n_layer }, () => []);
+    const logits = gpt(BOS, 0, keys, values).map(l => l.data);
+    let maxErr = 0;
+    for (let i = 0; i < PARITY_REF.length; i++) maxErr = Math.max(maxErr, Math.abs(logits[i] - PARITY_REF[i]));
+    const ok = maxErr < 1e-4;
+    $('ioInfo').innerHTML = `parity: <span class="${ok ? 'ok' : 'bad'}">${ok ? 'PASS' : 'FAIL'}</span> · max abs error ${maxErr.toExponential(2)}`;
+    console.log('JS logits:', logits);
+    console.log('max abs error vs Python:', maxErr);
+  } catch (e) {
+    $('ioInfo').innerHTML = `<span class="bad">parity needs weights.json via a local server (fetch blocked on file://).</span>`;
+  }
+}
+
+// --- weights save/load via file ---
+function saveWeights() {
+  if (!PARAMS) return;
+  const bundle = { config: CFG, uchars, weights: PARAMS.map(p => p.data) };
+  const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'weights.json'; a.click();
+}
+
+// ============================================================================
+//  events
+// ============================================================================
+$('dataset').value = DEFAULT_NAMES;
+$('rebuild').onclick = rebuild;
+$('train').onclick = trainLoop;
+$('pause').onclick = () => { training = false; };
+$('gen').onclick = () => {
+  if (!CFG) rebuild();
+  const r = generate(parseFloat($('temp').value), $('prefix').value);
+  renderGen([...r.name, ''], '');
+  $('genOut').textContent = r.name;
+  if (r.probs) renderProbs(r.probs, -1);
+  infState = null;
+};
+$('step').onclick = () => { if (!CFG) rebuild(); if (!infState) resetInfer(); inferStep(); };
+$('prefix').addEventListener('input', () => { infState = null; });
+$('showAttn').onclick = showAttention;
+$('gForward').onclick = () => { buildGraph(); G.phase = 'forward'; $('graphInfo').textContent = `forward: e = a·b = ${G.e.data}, L = e + c = ${G.L.data}`; drawGraph(); };
+$('gBackward').onclick = () => { if (!G) buildGraph(); G.L.backward(); G.phase = 'backward'; $('graphInfo').textContent = `backward: ∂L/∂a=${G.a.grad}, ∂L/∂b=${G.b.grad}, ∂L/∂c=${G.c.grad} (chain rule)`; drawGraph(); };
+$('gReset').onclick = () => { buildGraph(); $('graphInfo').textContent = ''; drawGraph(); };
+$('loadPre').onclick = loadPretrained;
+$('parity').onclick = runParity;
+$('saveW').onclick = saveWeights;
+$('loadW').onclick = () => $('wInput').click();
+$('wInput').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { try { applyWeightsBundle(JSON.parse(rd.result)); $('ioInfo').innerHTML = '<span class="ok">weights loaded</span>'; showSamples(); } catch (err) { $('ioInfo').innerHTML = '<span class="bad">invalid weights file</span>'; } };
+  rd.readAsText(f);
+};
+$('loadFile').onclick = () => $('fileInput').click();
+$('fileInput').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { $('dataset').value = rd.result.split(/\r?\n/).map(s => s.trim()).filter(Boolean).join('\n'); };
+  rd.readAsText(f);
+};
+
+// ============================================================================
+//  teaching-notebook rendering + wiring
+// ============================================================================
+const $ns = (sel) => document.querySelectorAll(sel);
+
+function renderProse() {
+  $ns('script.prose-src').forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'prose';
+    div.innerHTML = marked.parse(s.textContent);
+    s.replaceWith(div);
+  });
+}
+function renderCode() {
+  $ns('script.code-src').forEach(s => {
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    code.className = 'language-' + (s.dataset.lang || 'python');
+    code.textContent = s.textContent.replace(/^\n+/, '').replace(/\s+$/, '');
+    pre.appendChild(code);
+    s.replaceWith(pre);
+    try { hljs.highlightElement(code); } catch (e) {}
+  });
+}
+function renderMermaidBlocks() {
+  $ns('script.mermaid-src').forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = s.textContent.trim();
+    div.dataset.src = s.textContent.trim();
+    s.replaceWith(div);
+  });
+  renderMermaidDiagrams();
+}
+function renderMermaidDiagrams() {
+  if (!window.mermaid) return;
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  try {
+    window.mermaid.initialize({ startOnLoad: false, theme: isLight ? 'default' : 'dark', securityLevel: 'loose', fontFamily: 'system-ui, sans-serif' });
+    document.querySelectorAll('.mermaid').forEach((el, i) => {
+      if (el.dataset.src) { el.removeAttribute('data-processed'); el.innerHTML = el.dataset.src; }
+    });
+    window.mermaid.run({ querySelector: '.mermaid' });
+  } catch (e) {}
+}
+function renderMath() {
+  try {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: '$$', right: '$$', display: true },
+        { left: '$', right: '$', display: false },
+        { left: '\\(', right: '\\)', display: false },
+        { left: '\\[', right: '\\]', display: true },
+      ],
+      throwOnError: false,
+    });
+  } catch (e) {}
+}
+function buildTOC() {
+  const toc = $('toc'); if (!toc) return;
+  const links = [];
+  document.querySelectorAll('section.cell[id]').forEach(sec => {
+    const h = sec.querySelector('h2'); if (!h) return;
+    const title = h.getAttribute('data-toc') || h.textContent.trim();
+    const a = document.createElement('a'); a.href = '#' + sec.id; a.textContent = title;
+    a.onclick = (e) => { e.preventDefault(); sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); history.replaceState(null, '', '#' + sec.id); };
+    toc.appendChild(a); links.push({ a, sec });
+  });
+  const spy = () => {
+    let cur = links[0];
+    for (const l of links) if (l.sec.getBoundingClientRect().top <= 120) cur = l;
+    links.forEach(l => l.a.classList.toggle('active', l === cur));
+  };
+  window.addEventListener('scroll', spy, { passive: true }); spy();
+}
+function renderStateDict() {
+  const tb = $('sdTable'); if (!tb || !CFG) return;
+  const { vocab_size, n_embd, block_size, n_layer } = CFG;
+  const rows = [
+    ['wte', `${vocab_size} × ${n_embd}`, 'token embedding table'],
+    ['wpe', `${block_size} × ${n_embd}`, 'positional embedding table'],
+    ['lm_head', `${vocab_size} × ${n_embd}`, 'final projection to next-token scores'],
+  ];
+  for (let i = 0; i < n_layer; i++) {
+    rows.push([`layer${i}.attn_wq/wk/wv/wo`, `${n_embd} × ${n_embd}`, 'attention projections (×4)']);
+    rows.push([`layer${i}.mlp_fc1`, `${4 * n_embd} × ${n_embd}`, 'MLP expand']);
+    rows.push([`layer${i}.mlp_fc2`, `${n_embd} × ${4 * n_embd}`, 'MLP contract']);
+  }
+  tb.innerHTML = '<tr><th>weight</th><th>shape</th><th>role</th></tr>' +
+    rows.map(r => `<tr><td class="mono">${r[0]}</td><td class="mono">${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+  const pi = $('paramInfo');
+  if (pi) pi.innerHTML = `Flattened into one list: <b class="ok">${PARAMS ? PARAMS.length : '–'}</b> parameters · vocab <b>${vocab_size}</b> · context <b>${block_size}</b>.`;
+}
+function renderTok() {
+  const inp = $('tokInput'), out = $('tokOut'); if (!inp || !out) return;
+  const s = [...inp.value.toLowerCase()].filter(c => c in charToId);
+  const ids = [BOS, ...s.map(c => charToId[c]), BOS];
+  const labels = ['BOS', ...s, 'BOS'];
+  out.innerHTML = ids.map((id, k) => {
+    const bos = (k === 0 || k === ids.length - 1);
+    return `<div class="tok-chip ${bos ? 'bos' : ''}"><span class="c">${bos ? '␂' : labels[k]}</span><span class="i">${id}</span></div>`;
+  }).join('');
+}
+
+// initial boot (engine)
+rebuild();
+buildGraph(); drawGraph();
+
+// notebook init — wait for the CDN libs (loaded via defer/module) to be ready
+function notebookReady() {
+  return typeof marked !== 'undefined' && typeof hljs !== 'undefined'
+    && typeof renderMathInElement !== 'undefined' && window.mermaid;
+}
+function initNotebook() {
+  try { renderProse(); } catch (e) {}
+  try { renderCode(); } catch (e) {}
+  try { renderMermaidBlocks(); } catch (e) {}
+  try { renderMath(); } catch (e) {}
+  try { buildTOC(); } catch (e) {}
+  renderStateDict();
+  const gInputs = ['gA', 'gB', 'gC'];
+  gInputs.forEach(id => { const el = $(id); if (el) el.oninput = () => { buildGraph(); G.phase = 'forward'; drawGraph(); }; });
+  const tok = $('tokInput'); if (tok) { tok.addEventListener('input', renderTok); renderTok(); }
+  // auto-load pre-trained weights so inference/attention widgets are live immediately
+  loadPretrained().then(() => {
+    renderStateDict(); renderTok();
+    if ($('attnInput')) showAttention();
+  }).catch(() => {});
+}
+(function waitLibs(n) {
+  if (notebookReady()) initNotebook();
+  else if (n > 0) requestAnimationFrame(() => waitLibs(n - 1));
+  else initNotebook(); // best-effort even if a CDN lib failed to load
+})(600);
+
+window.addEventListener('resize', () => { drawLoss(); drawGraph(); });
+
+// ---- Dark / light theme switcher ----
+(function () {
+  const root = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  const darkCss = document.getElementById('hljs-dark');
+  const lightCss = document.getElementById('hljs-light');
+  function apply(theme) {
+    root.setAttribute('data-theme', theme);
+    const isLight = theme === 'light';
+    if (darkCss) darkCss.disabled = isLight;
+    if (lightCss) lightCss.disabled = !isLight;
+    if (btn) {
+      btn.querySelector('.ico').textContent = isLight ? '☀️' : '🌙';
+      btn.querySelector('.lbl').textContent = isLight ? 'Light' : 'Dark';
+      btn.setAttribute('aria-pressed', String(isLight));
+    }
+    try { localStorage.setItem('microgpt-theme', theme); } catch (e) {}
+    if (typeof renderMermaidDiagrams === 'function') renderMermaidDiagrams();
+    try { if (typeof drawLoss === 'function') drawLoss(); } catch (e) {}
+    try { if (typeof drawGraph === 'function') drawGraph(); } catch (e) {}
+    try { if (CFG && typeof showAttention === 'function' && document.getElementById('attnInput')) showAttention(); } catch (e) {}
+  }
+  apply(root.getAttribute('data-theme') || 'dark');
+  if (btn) btn.addEventListener('click', () => {
+    apply(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+  });
+})();
+</script>
+
+<footer class="site-footer">
+  Interactive teaching notebook &amp; browser port crafted by <a href="https://github.com/nishant-tamilselvan" target="_blank" rel="noopener"><b>Nishant Tamilselvan</b></a>.
+  Original <a class="mono" href="https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95" target="_blank" rel="noopener">microgpt.py</a> algorithm by Andrej Karpathy.
+</footer>
+</body>
+</html>
