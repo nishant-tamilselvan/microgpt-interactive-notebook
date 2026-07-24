@@ -9,6 +9,8 @@ A single-file, zero-dependency web app that turns Andrej Karpathy's
 into a **living, clickable notebook**. Read the story, poke every widget, and see a real
 transformer train and hallucinate brand-new names — all running natively in your browser.
 
+### 🔗 [**Try the live demo →**](https://nishant-tamilselvan.github.io/microgpt-interactive-notebook/)
+
 <br/>
 
 ![Built with](https://img.shields.io/badge/Built%20with-Vanilla%20JS-f7df1e?logo=javascript&logoColor=black)
